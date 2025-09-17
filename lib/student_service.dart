@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// KOMENTAR: Service untuk menangani operasi terkait data siswa di Supabase
+// KOMENTAR: Service untuk menangani operasi terkait data siswa di Supabase depina
 class StudentService {
   final SupabaseClient supabase;
 
