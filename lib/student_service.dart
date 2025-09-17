@@ -1,9 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// KOMENTAR: Service untuk menangani operasi terkait data siswa di Supabase depina
+// KOMENTAR: Service untuk menangani operasi terkait data siswa di Supabase
 class StudentService {
   final SupabaseClient supabase;
-
   StudentService() : supabase = Supabase.instance.client;
 
   // KOMENTAR: Mengambil daftar dusun dari tabel locations untuk autocomplete
@@ -26,7 +25,7 @@ class StudentService {
     try {
       final response = await supabase
           .from('locations')
-          .select('desa, kecamatan, kabupaten, kode_pos')
+          .select('desa, kecamatan, kabupaten, provinsi, kode_pos')
           .eq('dusun', dusun);
       return List<Map<String, dynamic>>.from(response);
     } on PostgrestException catch (e) {
@@ -68,7 +67,7 @@ class StudentService {
     }
   }
 
-  // KOMENTAR: Menyimpan atau memperbarui data siswa di tabel students (untuk review_page.dart)
+  // KOMENTAR: Menyimpan atau memperbarui data siswa di tabel students
   Future<void> saveStudent(Map<String, dynamic> data, {bool isEditMode = false}) async {
     try {
       // Validasi dusun ada di tabel locations
@@ -78,7 +77,6 @@ class StudentService {
           throw Exception('Dusun ${data['dusun']} tidak ditemukan di tabel locations');
         }
       }
-
       // Validasi NISN unik untuk insert baru
       if (!isEditMode) {
         final nisnExists = await isNisnExists(data['nisn']);
@@ -86,7 +84,6 @@ class StudentService {
           throw Exception('NISN ${data['nisn']} sudah terdaftar');
         }
       }
-
       if (isEditMode) {
         await supabase
             .from('students')
@@ -104,7 +101,7 @@ class StudentService {
     }
   }
 
-  // KOMENTAR: Menambahkan data siswa baru (untuk student_form_page.dart)
+  // KOMENTAR: Menambahkan data siswa baru
   Future<void> addStudent(Map<String, dynamic> data) async {
     try {
       // Validasi NISN unik
@@ -112,7 +109,6 @@ class StudentService {
       if (nisnExists) {
         throw Exception('NISN ${data['nisn']} sudah terdaftar');
       }
-
       await supabase.from('students').insert(data);
     } on PostgrestException catch (e) {
       throw Exception('Gagal menambah data siswa: ${e.message} (Code: ${e.code}, Details: ${e.details})');
@@ -121,7 +117,7 @@ class StudentService {
     }
   }
 
-  // KOMENTAR: Memperbarui data siswa berdasarkan ID (untuk student_form_page.dart)
+  // KOMENTAR: Memperbarui data siswa berdasarkan ID
   Future<void> updateStudent(int id, Map<String, dynamic> data) async {
     try {
       await supabase.from('students').update(data).eq('id', id);
