@@ -53,6 +53,7 @@ class _StudentFormPageState extends State<StudentFormPage> {
   void initState() {
     super.initState();
     _fetchDusunFromSupabase();
+    print('Initial dusunSuggestions: $dusunSuggestions'); // Debug initial state
     if (widget.existingData != null) {
       _fillExistingData();
     }
@@ -95,6 +96,7 @@ class _StudentFormPageState extends State<StudentFormPage> {
           .from('locations')
           .select('dusun, desa, kecamatan, kabupaten, provinsi, kode_pos')
           .order('dusun', ascending: true);
+      print('Supabase Response: $response'); // Log respons lengkap
       if (response.isEmpty) {
         setState(() {
           dusunError = 'Data dusun kosong';
@@ -105,27 +107,28 @@ class _StudentFormPageState extends State<StudentFormPage> {
       dusunData = {};
       dusunSuggestions = [];
       for (var item in response) {
-        final dusun = item['dusun'] ?? '';
-        final desa = item['desa'] ?? '';
-        final kecamatan = item['kecamatan'] ?? '';
-        // Create a unique key to handle duplicate dusun names
-        final key = '$dusun ($desa, $kecamatan)';
+        final dusun = item['dusun'] as String? ?? '';
+        final desa = item['desa'] as String? ?? '';
+        final kecamatan = item['kecamatan'] as String? ?? '';
         if (dusun.isNotEmpty) {
+          final key = dusun; // Gunakan dusun sebagai kunci utama
           dusunSuggestions.add(key);
           dusunData[key] = {
             'dusun': dusun,
             'desa': desa,
             'kecamatan': kecamatan,
-            'kabupaten': item['kabupaten'] ?? '',
-            'provinsi': item['provinsi'] ?? '',
-            'kode_pos': item['kode_pos'] ?? '',
+            'kabupaten': item['kabupaten'] as String? ?? '',
+            'provinsi': item['provinsi'] as String? ?? '',
+            'kode_pos': item['kode_pos'] as String? ?? '',
           };
+          print('Added Dusun: $key, Full Data: ${dusunData[key]}'); // Log setiap dusun
         }
       }
       setState(() {
         isDusunLoading = false;
       });
     } catch (e) {
+      print('Error fetching dusun: $e'); // Log error
       setState(() {
         dusunError = 'Gagal memuat data dusun: $e';
         isDusunLoading = false;
@@ -144,6 +147,8 @@ class _StudentFormPageState extends State<StudentFormPage> {
         provinsiController.text = data['provinsi'] ?? '';
         kodePosController.text = data['kode_pos'] ?? '';
       });
+    } else {
+      print('Data for key "$key" not found in dusunData');
     }
   }
 
@@ -188,7 +193,7 @@ class _StudentFormPageState extends State<StudentFormPage> {
               onPressed: () => Navigator.of(context).pop(true),
             ),
           ],
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
         );
       },
     );
@@ -316,8 +321,13 @@ class _StudentFormPageState extends State<StudentFormPage> {
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Autocomplete<String>(
         optionsBuilder: (TextEditingValue textEditingValue) {
-          if (textEditingValue.text.isEmpty) return dusunSuggestions;
-          return dusunSuggestions.where((option) => option.toLowerCase().contains(textEditingValue.text.toLowerCase()));
+          print('Text input: ${textEditingValue.text}, Suggestions: $dusunSuggestions'); // Debug
+          if (textEditingValue.text.isEmpty) {
+            return dusunSuggestions;
+          }
+          return dusunSuggestions.where((option) {
+            return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+          }).toList();
         },
         onSelected: (selection) {
           _autoFillAddress(selection);
@@ -345,10 +355,12 @@ class _StudentFormPageState extends State<StudentFormPage> {
             onChanged: (value) {
               if (_debounce?.isActive ?? false) _debounce!.cancel();
               _debounce = Timer(const Duration(milliseconds: 300), () {
-                dusunController.text = value;
-                if (dusunData.containsKey(value)) {
-                  _autoFillAddress(value);
-                }
+                setState(() {
+                  dusunController.text = value;
+                  if (dusunData.containsKey(value)) {
+                    _autoFillAddress(value);
+                  }
+                });
               });
             },
           );
@@ -396,7 +408,6 @@ class _StudentFormPageState extends State<StudentFormPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Data Pribadi
               const Text('Data Pribadi', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -462,7 +473,6 @@ class _StudentFormPageState extends State<StudentFormPage> {
                 ],
               ),
               const SizedBox(height: 16),
-              // Data Alamat
               const Text('Data Alamat', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -500,7 +510,6 @@ class _StudentFormPageState extends State<StudentFormPage> {
                 ],
               ),
               const SizedBox(height: 16),
-              // Data Orang Tua/Wali
               const Text('Data Orang Tua/Wali', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
