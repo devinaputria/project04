@@ -1,7 +1,10 @@
+// File: student_form_page.dart (Fixed intl package import, added null checks, improved date picker)
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'student_service.dart';
 import 'dart:async';
+import 'review_page.dart';
+import 'package:intl/intl.dart';
 
 class StudentFormPage extends StatefulWidget {
   final Color primaryDarkBlue;
@@ -17,7 +20,7 @@ class StudentFormPage extends StatefulWidget {
   State<StudentFormPage> createState() => _StudentFormPageState();
 }
 
-class _StudentFormPageState extends State<StudentFormPage> {
+class _StudentFormPageState extends State<StudentFormPage> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final StudentService studentService = StudentService();
   final TextEditingController nameController = TextEditingController();
@@ -39,7 +42,7 @@ class _StudentFormPageState extends State<StudentFormPage> {
   final TextEditingController namaAyahController = TextEditingController();
   final TextEditingController namaIbuController = TextEditingController();
   final TextEditingController namaWaliController = TextEditingController();
-  final TextEditingController alamatOrangTuaController = TextEditingController();
+  final TextEditingController alamatOrtuController = TextEditingController();
   bool isLoading = false;
   bool isDusunLoading = true;
   String? dusunError;
@@ -48,15 +51,19 @@ class _StudentFormPageState extends State<StudentFormPage> {
   final List<String> agamaOptions = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu', 'Lainnya'];
   final List<String> jenisKelaminOptions = ['Laki-laki', 'Perempuan'];
   Timer? _debounce;
+  double _opacity = 0.0;
 
   @override
   void initState() {
     super.initState();
+    print('existingData: ${widget.existingData}');
     _fetchDusunFromSupabase();
-    print('Initial dusunSuggestions: $dusunSuggestions'); // Debug initial state
     if (widget.existingData != null) {
       _fillExistingData();
     }
+    Future.delayed(const Duration(milliseconds: 300), () {
+      setState(() => _opacity = 1.0);
+    });
   }
 
   void _fillExistingData() {
@@ -67,7 +74,7 @@ class _StudentFormPageState extends State<StudentFormPage> {
     selectedAgama = data['agama'];
     selectedJenisKelamin = data['jenis_kelamin'];
     tempatLahirController.text = data['tempat_lahir'] ?? '';
-    tanggalLahirController.text = data['tanggal_lahir'] ?? '';
+    tanggalLahirController.text = data['tanggal_lahir'] != null ? DateFormat('yyyy-MM-dd').format(DateTime.parse(data['tanggal_lahir'])) : '';
     noTeleponController.text = data['no_telepon'] ?? '';
     nikController.text = data['nik'] ?? '';
     dusunController.text = data['dusun'] ?? '';
@@ -80,7 +87,7 @@ class _StudentFormPageState extends State<StudentFormPage> {
     namaAyahController.text = data['nama_ayah'] ?? '';
     namaIbuController.text = data['nama_ibu'] ?? '';
     namaWaliController.text = data['nama_wali'] ?? '';
-    alamatOrangTuaController.text = data['alamat_orang_tua'] ?? '';
+    alamatOrtuController.text = data['alamat_orang_tua'] ?? '';
     if (dusunData.containsKey(dusunController.text)) {
       _autoFillAddress(dusunController.text);
     }
@@ -92,11 +99,14 @@ class _StudentFormPageState extends State<StudentFormPage> {
       dusunError = null;
     });
     try {
+      final isConnected = await studentService.checkInternetConnection();
+      if (!isConnected) {
+        throw Exception('Tidak ada koneksi internet. Silakan periksa jaringan Anda.');
+      }
       final response = await studentService.supabase
           .from('locations')
           .select('dusun, desa, kecamatan, kabupaten, provinsi, kode_pos')
           .order('dusun', ascending: true);
-      print('Supabase Response: $response'); // Log respons lengkap
       if (response.isEmpty) {
         setState(() {
           dusunError = 'Data dusun kosong';
@@ -108,31 +118,41 @@ class _StudentFormPageState extends State<StudentFormPage> {
       dusunSuggestions = [];
       for (var item in response) {
         final dusun = item['dusun'] as String? ?? '';
-        final desa = item['desa'] as String? ?? '';
-        final kecamatan = item['kecamatan'] as String? ?? '';
         if (dusun.isNotEmpty) {
-          final key = dusun; // Gunakan dusun sebagai kunci utama
+          final key = dusun;
           dusunSuggestions.add(key);
           dusunData[key] = {
             'dusun': dusun,
-            'desa': desa,
-            'kecamatan': kecamatan,
+            'desa': item['desa'] as String? ?? '',
+            'kecamatan': item['kecamatan'] as String? ?? '',
             'kabupaten': item['kabupaten'] as String? ?? '',
             'provinsi': item['provinsi'] as String? ?? '',
             'kode_pos': item['kode_pos'] as String? ?? '',
           };
-          print('Added Dusun: $key, Full Data: ${dusunData[key]}'); // Log setiap dusun
         }
       }
       setState(() {
         isDusunLoading = false;
       });
     } catch (e) {
-      print('Error fetching dusun: $e'); // Log error
       setState(() {
-        dusunError = 'Gagal memuat data dusun: $e';
+        dusunError = e.toString().contains('Tidak ada koneksi internet')
+            ? 'Tidak ada koneksi internet. Silakan periksa jaringan Anda.'
+            : 'Gagal Terjadi Kesalahan pada Supabase anda tolong cek internet anda dulu ';
         isDusunLoading = false;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(dusunError!),
+          backgroundColor: Colors.red[700],
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: 'Coba Lagi',
+            textColor: Colors.white,
+            onPressed: _fetchDusunFromSupabase,
+          ),
+        ),
+      );
     }
   }
 
@@ -140,15 +160,12 @@ class _StudentFormPageState extends State<StudentFormPage> {
     final data = dusunData[key];
     if (data != null) {
       setState(() {
-        dusunController.text = data['dusun'] ?? '';
         desaController.text = data['desa'] ?? '';
         kecamatanController.text = data['kecamatan'] ?? '';
         kabupatenController.text = data['kabupaten'] ?? '';
         provinsiController.text = data['provinsi'] ?? '';
         kodePosController.text = data['kode_pos'] ?? '';
       });
-    } else {
-      print('Data for key "$key" not found in dusunData');
     }
   }
 
@@ -172,96 +189,150 @@ class _StudentFormPageState extends State<StudentFormPage> {
     namaAyahController.dispose();
     namaIbuController.dispose();
     namaWaliController.dispose();
-    alamatOrangTuaController.dispose();
+    alamatOrtuController.dispose();
     super.dispose();
   }
 
-  Future<bool?> _showConfirmationDialog(String title, String content) async {
-    return showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(title, style: TextStyle(color: widget.primaryDarkBlue)),
-          content: Text(content),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Batal'),
-              onPressed: () => Navigator.of(context).pop(false),
-            ),
-            TextButton(
-              child: const Text('Konfirmasi'),
-              onPressed: () => Navigator.of(context).pop(true),
-            ),
-          ],
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
-        );
-      },
-    );
-  }
-
-  Future<void> _saveStudent() async {
+  Future<void> _proceedToReview() async {
     if (!_formKey.currentState!.validate()) return;
-    final isEdit = widget.existingData != null;
-    final action = isEdit ? 'memperbarui' : 'menambahkan';
-    final name = nameController.text.trim();
-    final confirm = await _showConfirmationDialog(
-      isEdit ? 'Konfirmasi Perubahan' : 'Konfirmasi Penyimpanan',
-      'Apakah Anda yakin ingin $action data siswa "$name"?',
-    );
-    if (confirm != true) return;
-    setState(() => isLoading = true);
-    final studentData = {
-      'name': nameController.text.trim(),
+
+    final isConnected = await studentService.checkInternetConnection();
+    if (!isConnected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Tidak ada koneksi internet. Silakan periksa jaringan Anda.'),
+          backgroundColor: Colors.red[700],
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: 'Coba Lagi',
+            textColor: Colors.white,
+            onPressed: _proceedToReview,
+          ),
+        ),
+      );
+      return;
+    }
+
+    final data = {
       'nisn': nisnController.text.trim(),
-      'desa': desaController.text.trim(),
-      'agama': selectedAgama,
-      'jenis_kelamin': selectedJenisKelamin,
+      'name': nameController.text.trim(),
+      'jenis_kelamin': selectedJenisKelamin ?? '',
+      'agama': selectedAgama ?? '',
       'tempat_lahir': tempatLahirController.text.trim(),
       'tanggal_lahir': tanggalLahirController.text.trim(),
       'no_telepon': noTeleponController.text.trim(),
       'nik': nikController.text.trim(),
+      'desa': desaController.text.trim(),
       'dusun': dusunController.text.trim(),
       'kecamatan': kecamatanController.text.trim(),
-      'rt_rw': rtRwController.text.trim(),
-      'jalan': jalanController.text.trim(),
       'kabupaten': kabupatenController.text.trim(),
       'provinsi': provinsiController.text.trim(),
       'kode_pos': kodePosController.text.trim(),
+      'jalan': jalanController.text.trim(),
+      'rt_rw': rtRwController.text.trim(),
       'nama_ayah': namaAyahController.text.trim(),
       'nama_ibu': namaIbuController.text.trim(),
       'nama_wali': namaWaliController.text.trim(),
-      'alamat_orang_tua': alamatOrangTuaController.text.trim(),
+      'alamat_orang_tua': alamatOrtuController.text.trim(),
     };
-    try {
-      if (isEdit) {
-        final id = widget.existingData!['id'] ?? widget.existingData!['nisn'];
-        await studentService.updateStudent(id, studentData);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Data siswa berhasil diperbarui')));
-      } else {
-        await studentService.addStudent(studentData);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Data siswa berhasil ditambahkan')));
-      }
-      if (mounted) Navigator.pop(context, true);
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal menyimpan data: $e')));
-    } finally {
-      if (mounted) setState(() => isLoading = false);
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReviewPage(
+          primaryDarkBlue: widget.primaryDarkBlue,
+          nisn: data['nisn'] as String,
+          name: data['name'] as String,
+          jenisKelamin: data['jenis_kelamin'] as String,
+          agama: data['agama'] as String,
+          tempatTanggalLahir: '${data['tempat_lahir']}, ${data['tanggal_lahir']}',
+          noTelepon: data['no_telepon'] as String,
+          nik: data['nik'] as String,
+          alamat: {
+            'jalan': data['jalan'],
+            'rt_rw': data['rt_rw'],
+            'dusun': data['dusun'],
+            'desa': data['desa'],
+            'kecamatan': data['kecamatan'],
+            'kabupaten': data['kabupaten'],
+            'provinsi': data['provinsi'],
+            'kode_pos': data['kode_pos'],
+          },
+          namaAyah: data['nama_ayah'] as String,
+          namaIbu: data['nama_ibu'] as String,
+          namaWali: data['nama_wali'] as String?,
+          alamatOrtu: data['alamat_orang_tua'] as String,
+          isEditMode: widget.existingData != null,
+        ),
+      ),
+    );
+    if (result != null) {
+      Navigator.pop(context, true);
     }
+  }
+
+  Future<void> _pickDate() async {
+    DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: widget.primaryDarkBlue,
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(foregroundColor: widget.primaryDarkBlue),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        tanggalLahirController.text = DateFormat('yyyy-MM-dd').format(picked);
+      });
+    }
+  }
+
+  Widget _buildSection(String title, List<Widget> children) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: ExpansionTile(
+        title: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        children: children,
+        initiallyExpanded: true,
+      ),
+    );
   }
 
   Widget _buildTextField({
     required String label,
     required TextEditingController controller,
+    IconData? icon,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
+    bool readOnly = false,
+    VoidCallback? onTap,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: TextFormField(
         controller: controller,
         keyboardType: keyboardType,
+        readOnly: readOnly,
+        onTap: onTap,
+        enabled: true,
         decoration: InputDecoration(
           labelText: label,
+          prefixIcon: icon != null ? Icon(icon, color: widget.primaryDarkBlue) : null,
           labelStyle: const TextStyle(fontSize: 14, color: Colors.black54),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
           focusedBorder: OutlineInputBorder(
@@ -275,7 +346,7 @@ class _StudentFormPageState extends State<StudentFormPage> {
           filled: true,
           fillColor: Colors.grey[50],
         ),
-        validator: validator ?? (value) => value == null || value.isEmpty ? '$label wajib diisi' : null,
+        validator: validator,
       ),
     );
   }
@@ -285,6 +356,7 @@ class _StudentFormPageState extends State<StudentFormPage> {
     required String? value,
     required List<String> items,
     required ValueChanged<String?> onChanged,
+    IconData? icon,
     String? Function(String?)? validator,
   }) {
     return Padding(
@@ -293,6 +365,7 @@ class _StudentFormPageState extends State<StudentFormPage> {
         value: value,
         decoration: InputDecoration(
           labelText: label,
+          prefixIcon: icon != null ? Icon(icon, color: widget.primaryDarkBlue) : null,
           labelStyle: const TextStyle(fontSize: 14, color: Colors.black54),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10.0)),
           focusedBorder: OutlineInputBorder(
@@ -306,31 +379,41 @@ class _StudentFormPageState extends State<StudentFormPage> {
           filled: true,
           fillColor: Colors.grey[50],
         ),
-        items: items.map((item) => DropdownMenuItem(value: item, child: Text(item, style: const TextStyle(fontSize: 14)))).toList(),
+        items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
         onChanged: onChanged,
-        validator: validator ?? (value) => value == null ? '$label wajib diisi' : null,
-        dropdownColor: Colors.white,
+        validator: validator,
       ),
     );
   }
 
   Widget _buildAutocompleteDusun() {
     if (isDusunLoading) return const Center(child: CircularProgressIndicator());
-    if (dusunError != null) return Text(dusunError!, style: const TextStyle(color: Colors.red));
+    if (dusunError != null) return Column(
+      children: [
+        Text(dusunError!, style: const TextStyle(color: Colors.red)),
+        const SizedBox(height: 10),
+        ElevatedButton(
+          onPressed: _fetchDusunFromSupabase,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: widget.primaryDarkBlue,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          child: const Text('Coba Lagi', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Autocomplete<String>(
         optionsBuilder: (TextEditingValue textEditingValue) {
-          print('Text input: ${textEditingValue.text}, Suggestions: $dusunSuggestions'); // Debug
-          if (textEditingValue.text.isEmpty) {
-            return dusunSuggestions;
-          }
-          return dusunSuggestions.where((option) {
-            return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
-          }).toList();
+          final input = textEditingValue.text.toLowerCase();
+          return dusunSuggestions.where((option) => option.toLowerCase().contains(input)).toList();
         },
         onSelected: (selection) {
-          _autoFillAddress(selection);
+          setState(() {
+            dusunController.text = selection;
+            _autoFillAddress(selection);
+          });
         },
         fieldViewBuilder: (context, fieldController, focusNode, onFieldSubmitted) {
           fieldController.text = dusunController.text;
@@ -339,6 +422,7 @@ class _StudentFormPageState extends State<StudentFormPage> {
             focusNode: focusNode,
             decoration: InputDecoration(
               labelText: 'Dusun',
+              prefixIcon: Icon(Icons.location_on, color: widget.primaryDarkBlue),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
@@ -353,14 +437,10 @@ class _StudentFormPageState extends State<StudentFormPage> {
               return null;
             },
             onChanged: (value) {
-              if (_debounce?.isActive ?? false) _debounce!.cancel();
+              _debounce?.cancel();
               _debounce = Timer(const Duration(milliseconds: 300), () {
-                setState(() {
-                  dusunController.text = value;
-                  if (dusunData.containsKey(value)) {
-                    _autoFillAddress(value);
-                  }
-                });
+                setState(() => dusunController.text = value);
+                if (dusunData.containsKey(value)) _autoFillAddress(value);
               });
             },
           );
@@ -370,18 +450,17 @@ class _StudentFormPageState extends State<StudentFormPage> {
             alignment: Alignment.topLeft,
             child: Material(
               elevation: 4.0,
-              child: SizedBox(
-                height: 200.0,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                constraints: BoxConstraints(maxHeight: 200),
                 child: ListView.builder(
-                  padding: const EdgeInsets.all(8.0),
+                  shrinkWrap: true,
                   itemCount: options.length,
                   itemBuilder: (context, index) {
                     final option = options.elementAt(index);
-                    return GestureDetector(
+                    return ListTile(
+                      title: Text(option),
                       onTap: () => onSelected(option),
-                      child: ListTile(
-                        title: Text(option, style: const TextStyle(fontSize: 14)),
-                      ),
                     );
                   },
                 ),
@@ -397,161 +476,110 @@ class _StudentFormPageState extends State<StudentFormPage> {
   Widget build(BuildContext context) {
     final isEdit = widget.existingData != null;
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: widget.primaryDarkBlue,
-        title: Text(isEdit ? 'Edit Data Siswa' : 'Tambah Siswa'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(isEdit ? 'Edit Data Siswa' : 'Tambah Siswa', style: const TextStyle(color: Colors.white)),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(gradient: LinearGradient(colors: [widget.primaryDarkBlue, Colors.blue[800]!])),
+        ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Data Pribadi', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              Row(
+      body: Container(
+        decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.blue[50]!, Colors.white])),
+        child: AnimatedOpacity(
+          opacity: _opacity,
+          duration: const Duration(seconds: 1),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      children: [
-                        _buildTextField(label: 'Nama Lengkap', controller: nameController),
-                        _buildTextField(
-                          label: 'NISN',
-                          controller: nisnController,
-                          keyboardType: TextInputType.number,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) return 'NISN wajib diisi';
-                            if (value.length != 10) return 'NISN harus 10 karakter';
-                            return null;
-                          },
-                        ),
-                        _buildDropdownField(
-                          label: 'Agama',
-                          value: selectedAgama,
-                          items: agamaOptions,
-                          onChanged: (v) => setState(() => selectedAgama = v),
-                        ),
-                        _buildDropdownField(
-                          label: 'Jenis Kelamin',
-                          value: selectedJenisKelamin,
-                          items: jenisKelaminOptions,
-                          onChanged: (v) => setState(() => selectedJenisKelamin = v),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        _buildTextField(label: 'Tempat Lahir', controller: tempatLahirController),
-                        _buildTextField(
-                          label: 'Tanggal Lahir (YYYY-MM-DD)',
-                          controller: tanggalLahirController,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) return 'Tanggal lahir wajib diisi';
-                            final regex = RegExp(r'^\d{4}-\d{2}-\d{2}$');
-                            if (!regex.hasMatch(value)) return 'Format: YYYY-MM-DD';
-                            return null;
-                          },
-                        ),
-                        _buildTextField(label: 'No Telepon', controller: noTeleponController, keyboardType: TextInputType.phone),
-                        _buildTextField(
-                          label: 'NIK',
-                          controller: nikController,
-                          keyboardType: TextInputType.number,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) return 'NIK wajib diisi';
-                            if (value.length != 16) return 'NIK harus 16 digit';
-                            return null;
-                          },
-                        ),
-                      ],
+                  _buildSection('Data Pribadi', [
+                    Row(children: [
+                      Expanded(child: _buildTextField(label: 'Nama Lengkap', controller: nameController, icon: Icons.person, validator: (v) => v == null || v.isEmpty ? 'Nama lengkap wajib diisi' : null)),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildTextField(label: 'NISN', controller: nisnController, icon: Icons.badge, keyboardType: TextInputType.number, validator: (v) => v == null || v.length != 10 ? 'NISN harus 10 karakter' : null)),
+                    ]),
+                    Row(children: [
+                      Expanded(child: _buildDropdownField(label: 'Jenis Kelamin', value: selectedJenisKelamin, items: jenisKelaminOptions, onChanged: (v) => setState(() => selectedJenisKelamin = v), icon: Icons.transgender, validator: (v) => v == null ? 'Jenis kelamin wajib dipilih' : null)),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildDropdownField(label: 'Agama', value: selectedAgama, items: agamaOptions, onChanged: (v) => setState(() => selectedAgama = v), icon: Icons.church, validator: (v) => v == null ? 'Agama wajib dipilih' : null)),
+                    ]),
+                    Row(children: [
+                      Expanded(child: _buildTextField(label: 'Tempat Lahir', controller: tempatLahirController, icon: Icons.place, validator: (v) => v == null || v.isEmpty ? 'Tempat lahir wajib diisi' : null)),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildTextField(
+                        label: 'Tanggal Lahir',
+                        controller: tanggalLahirController,
+                        icon: Icons.calendar_today,
+                        readOnly: true,
+                        onTap: _pickDate,
+                        validator: (v) => v == null || v.isEmpty ? 'Tanggal lahir wajib diisi' : null,
+                      )),
+                    ]),
+                    Row(children: [
+                      Expanded(child: _buildTextField(label: 'No Telp/HP', controller: noTeleponController, icon: Icons.phone, keyboardType: TextInputType.phone, validator: (v) {
+                        if (v == null || v.isEmpty) return 'No telp wajib diisi';
+                        if (v.length < 12 || v.length > 15 || !RegExp(r'^\d+$').hasMatch(v)) return 'No telp 12-15 digit angka';
+                        return null;
+                      })),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildTextField(label: 'NIK', controller: nikController, icon: Icons.card_membership, keyboardType: TextInputType.number, validator: (v) => v == null || v.length != 16 ? 'NIK harus 16 digit' : null)),
+                    ]),
+                  ]),
+                  _buildSection('Alamat', [
+                    Row(children: [
+                      Expanded(child: _buildTextField(label: 'Jalan', controller: jalanController, icon: Icons.streetview, validator: (v) => v == null || v.isEmpty ? 'Jalan wajib diisi' : null)),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildTextField(label: 'RT/RW', controller: rtRwController, icon: Icons.home_work, validator: (v) => v == null || v.isEmpty || !RegExp(r'^\d{3}/\d{3}$').hasMatch(v) ? 'RT/RW wajib diisi (format 001/002)' : null)),
+                    ]),
+                    _buildAutocompleteDusun(),
+                    Row(children: [
+                      Expanded(child: _buildTextField(label: 'Desa', controller: desaController, icon: Icons.home)),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildTextField(label: 'Kecamatan', controller: kecamatanController, icon: Icons.location_city)),
+                    ]),
+                    Row(children: [
+                      Expanded(child: _buildTextField(label: 'Kabupaten', controller: kabupatenController, icon: Icons.map)),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildTextField(label: 'Provinsi', controller: provinsiController, icon: Icons.public)),
+                    ]),
+                    _buildTextField(label: 'Kode Pos', controller: kodePosController, icon: Icons.local_post_office, keyboardType: TextInputType.number, validator: (v) => v == null || v.length != 5 ? 'Kode pos harus 5 digit' : null),
+                  ]),
+                  _buildSection('Orang Tua / Wali', [
+                    Row(children: [
+                      Expanded(child: _buildTextField(label: 'Nama Ayah', controller: namaAyahController, icon: Icons.man, validator: (v) => v == null || v.isEmpty ? 'Nama ayah wajib diisi' : null)),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildTextField(label: 'Nama Ibu', controller: namaIbuController, icon: Icons.woman, validator: (v) => v == null || v.isEmpty ? 'Nama ibu wajib diisi' : null)),
+                    ]),
+                    Row(children: [
+                      Expanded(child: _buildTextField(label: 'Nama Wali (opsional)', controller: namaWaliController, icon: Icons.person_outline)),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildTextField(label: 'Alamat Orang Tua/Wali', controller: alamatOrtuController, icon: Icons.home)),
+                    ]),
+                  ]),
+                  const SizedBox(height: 24),
+                  Center(
+                    child: ElevatedButton(
+                      onPressed: isLoading ? null : _proceedToReview,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: widget.primaryDarkBlue,
+                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 10,
+                        shadowColor: Colors.black.withOpacity(0.5),
+                      ),
+                      child: isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : Text(isEdit ? 'Update' : 'Review & Simpan', style: const TextStyle(fontSize: 16, color: Colors.white)),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              const Text('Data Alamat', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      children: [
-                        _buildAutocompleteDusun(),
-                        _buildTextField(label: 'Kecamatan', controller: kecamatanController),
-                        _buildTextField(label: 'RT/RW', controller: rtRwController, keyboardType: TextInputType.text),
-                        _buildTextField(label: 'Jalan', controller: jalanController),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        _buildTextField(label: 'Kabupaten', controller: kabupatenController),
-                        _buildTextField(label: 'Provinsi', controller: provinsiController),
-                        _buildTextField(
-                          label: 'Kode Pos',
-                          controller: kodePosController,
-                          keyboardType: TextInputType.number,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) return 'Kode pos wajib diisi';
-                            if (!RegExp(r'^\d{5}$').hasMatch(value)) return 'Kode pos harus 5 digit';
-                            return null;
-                          },
-                        ),
-                        _buildTextField(label: 'Desa', controller: desaController),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Text('Data Orang Tua/Wali', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      children: [
-                        _buildTextField(label: 'Nama Ayah', controller: namaAyahController),
-                        _buildTextField(label: 'Nama Ibu', controller: namaIbuController),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        _buildTextField(label: 'Nama Wali', controller: namaWaliController),
-                        _buildTextField(label: 'Alamat Orang Tua', controller: alamatOrangTuaController),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Center(
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: isLoading ? null : _saveStudent,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: widget.primaryDarkBlue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : Text(isEdit ? 'Update' : 'Simpan', style: const TextStyle(fontSize: 16)),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
