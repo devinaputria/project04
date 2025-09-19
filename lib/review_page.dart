@@ -54,8 +54,10 @@ class _ReviewPageState extends State<ReviewPage>
   @override
   void initState() {
     super.initState();
-    _animController =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
     _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeIn);
     _animController.forward();
   }
@@ -69,7 +71,9 @@ class _ReviewPageState extends State<ReviewPage>
   Future<void> _saveToSupabase() async {
     if (_isSaving) return;
     final confirm = await _confirmAction(
-        widget.isEditMode ? 'Perbarui' : 'Simpan', widget.name);
+      widget.isEditMode ? 'Perbarui' : 'Simpan',
+      widget.name,
+    );
     if (confirm != true || !mounted) return;
 
     setState(() {
@@ -113,11 +117,15 @@ class _ReviewPageState extends State<ReviewPage>
         _isSaved = true;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(widget.isEditMode
-            ? '✅ Data berhasil diperbarui!'
-            : '✅ Data berhasil disimpan!'),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.isEditMode
+                ? '✅ Data berhasil diperbarui!'
+                : '✅ Data berhasil disimpan!',
+          ),
+        ),
+      );
 
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) Navigator.pop(context, true);
@@ -125,8 +133,9 @@ class _ReviewPageState extends State<ReviewPage>
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Gagal menyimpan: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('❌ Gagal menyimpan: $e')));
     }
   }
 
@@ -147,19 +156,29 @@ class _ReviewPageState extends State<ReviewPage>
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('$action Konfirmasi',
-            style: TextStyle(color: widget.primaryDarkBlue, fontWeight: FontWeight.bold)),
+        title: Text(
+          '$action Konfirmasi',
+          style: TextStyle(
+            color: widget.primaryDarkBlue,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         content: Text(
-            'Apakah Anda yakin ingin $action data "$name"? Tindakan ini tidak bisa dibatalkan.'),
+          'Apakah Anda yakin ingin $action data "$name"? Tindakan ini tidak bisa dibatalkan.',
+        ),
         actions: [
           TextButton(
-              style: TextButton.styleFrom(foregroundColor: Colors.grey),
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Batal')),
+            style: TextButton.styleFrom(foregroundColor: Colors.grey),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
           TextButton(
-              style: TextButton.styleFrom(foregroundColor: widget.primaryDarkBlue),
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Ya')),
+            style: TextButton.styleFrom(
+              foregroundColor: widget.primaryDarkBlue,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Ya'),
+          ),
         ],
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         backgroundColor: Colors.white,
@@ -178,31 +197,36 @@ class _ReviewPageState extends State<ReviewPage>
   }
 
   void _navigateToEdit() async {
-    final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => StudentFormPage(
-      primaryDarkBlue: widget.primaryDarkBlue,
-      existingData: {
-        'nisn': widget.nisn,
-        'name': widget.name,
-        'jenis_kelamin': widget.jenisKelamin,
-        'agama': widget.agama,
-        'tempat_lahir': widget.tempatTanggalLahir.split(', ')[0],
-        'tanggal_lahir': widget.tempatTanggalLahir.split(', ')[1],
-        'no_telepon': widget.noTelepon,
-        'nik': widget.nik,
-        'jalan': widget.alamat['jalan'],
-        'rt_rw': widget.alamat['rt_rw'],
-        'dusun': widget.alamat['dusun'],
-        'desa': widget.alamat['desa'],
-        'kecamatan': widget.alamat['kecamatan'],
-        'kabupaten': widget.alamat['kabupaten'],
-        'provinsi': widget.alamat['provinsi'],
-        'kode_pos': widget.alamat['kode_pos'],
-        'nama_ayah': widget.namaAyah,
-        'nama_ibu': widget.namaIbu,
-        'nama_wali': widget.namaWali,
-        'alamat_orang_tua': widget.alamatOrtu,
-      },
-    )));
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StudentFormPage(
+          primaryDarkBlue: widget.primaryDarkBlue,
+          existingData: {
+            'nisn': widget.nisn,
+            'name': widget.name,
+            'jenis_kelamin': widget.jenisKelamin,
+            'agama': widget.agama,
+            'tempat_lahir': widget.tempatTanggalLahir.split(', ')[0],
+            'tanggal_lahir': widget.tempatTanggalLahir.split(', ')[1],
+            'no_telepon': widget.noTelepon,
+            'nik': widget.nik,
+            'jalan': widget.alamat['jalan'],
+            'rt_rw': widget.alamat['rt_rw'],
+            'dusun': widget.alamat['dusun'],
+            'desa': widget.alamat['desa'],
+            'kecamatan': widget.alamat['kecamatan'],
+            'kabupaten': widget.alamat['kabupaten'],
+            'provinsi': widget.alamat['provinsi'],
+            'kode_pos': widget.alamat['kode_pos'],
+            'nama_ayah': widget.namaAyah,
+            'nama_ibu': widget.namaIbu,
+            'nama_wali': widget.namaWali,
+            'alamat_orang_tua': widget.alamatOrtu,
+          },
+        ),
+      ),
+    );
     if (result == true) {
       Navigator.pop(context, true); // Refresh HomePage
     }
@@ -224,26 +248,32 @@ class _ReviewPageState extends State<ReviewPage>
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
               ),
               padding: const EdgeInsets.all(14),
               child: Row(
                 children: [
                   Icon(icon, color: Colors.white),
                   const SizedBox(width: 10),
-                  Text(title,
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold)),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
             ),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: children),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: children,
+              ),
             ),
           ],
         ),
@@ -258,15 +288,19 @@ class _ReviewPageState extends State<ReviewPage>
       child: Row(
         children: [
           Expanded(
-              flex: 3,
-              child: Text(label,
-                  style: TextStyle(
-                      color: widget.primaryDarkBlue,
-                      fontWeight: FontWeight.w600))),
+            flex: 3,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: widget.primaryDarkBlue,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
           Expanded(
-              flex: 5,
-              child: Text(display,
-                  style: const TextStyle(color: Colors.black87))),
+            flex: 5,
+            child: Text(display, style: const TextStyle(color: Colors.black87)),
+          ),
         ],
       ),
     );
@@ -279,9 +313,9 @@ class _ReviewPageState extends State<ReviewPage>
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
         backgroundColor: widget.primaryDarkBlue,
-        title: Text(widget.isEditMode
-            ? 'Edit Data Siswa'
-            : 'Review Data Siswa'),
+        title: Text(
+          widget.isEditMode ? 'Edit Data Siswa' : 'Review Data Siswa',
+        ),
         elevation: 6,
         actions: widget.isEditMode
             ? [
@@ -333,46 +367,57 @@ class _ReviewPageState extends State<ReviewPage>
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   ElevatedButton.icon(
-                    onPressed:
-                        _isSaving ? null : () => Navigator.pop(context),
+                    onPressed: _isSaving ? null : () => Navigator.pop(context),
                     style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey.shade600,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12))),
+                      backgroundColor: Colors.grey.shade600,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                     icon: const Icon(Icons.arrow_back),
                     label: const Text("Kembali"),
                   ),
                   ElevatedButton.icon(
                     onPressed: _isSaving ? null : _saveToSupabase,
                     style: ElevatedButton.styleFrom(
-                        backgroundColor: widget.primaryDarkBlue,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12))),
+                      backgroundColor: widget.primaryDarkBlue,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                     icon: _isSaving
                         ? const SizedBox(
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
                         : _isSaved
-                            ? const Icon(Icons.check, color: Colors.white)
-                            : const Icon(Icons.save),
+                        ? const Icon(Icons.check, color: Colors.white)
+                        : const Icon(Icons.save),
                     label: Text(
-                        _isSaving
-                            ? "Menyimpan..."
-                            : _isSaved
-                                ? "Tersimpan"
-                                : widget.isEditMode
-                                    ? "Perbarui"
-                                    : "Simpan",
-                        style: const TextStyle(color: Colors.white)),
+                      _isSaving
+                          ? "Menyimpan..."
+                          : _isSaved
+                          ? "Tersimpan"
+                          : widget.isEditMode
+                          ? "Perbarui"
+                          : "Simpan",
+                      style: const TextStyle(color: Colors.white),
+                    ),
                   ),
                 ],
-              )
+              ),
             ],
           ),
           if (_isSaving)
